@@ -24,16 +24,29 @@ namespace radium_UTXO_server
         public ICredentials Credentials;
         public JObject TryInvokeMethod(string a_sMethod, params object[] a_params)
         {
-            try { return InvokeMethod(a_sMethod, a_params); }
-            catch
+            bool sucess = false;
+            int count = 0;
+            while (!sucess)
             {
-                Console.WriteLine("retry invoke method " + a_sMethod + " " + (string)a_params[0].ToString());
-                System.Threading.Thread.Sleep(100);
-                return TryInvokeMethod(a_sMethod, a_params);
+                if (count >= 50)
+                    throw new Exception("Retry count exceded for " + a_sMethod);
+                try
+                {
+                    sucess = true;
+                    return InvokeMethod(a_sMethod, a_params);
+                }
+                catch
+                {
+                    System.Threading.Thread.Sleep(100);
+                    count += 1;
+                    sucess = false;
+                    Console.WriteLine("retry invoke method " + a_sMethod + " " + (string)a_params[0].ToString());
+                }
             }
+            return null;
         }
 
-        
+
 
         private JObject InvokeMethod(string a_sMethod, params object[] a_params)
         {
@@ -246,7 +259,7 @@ namespace radium_UTXO_server
         public int GetBlockCount()
         {
             //object test = InvokeMethod("getblockcount")["result"].ToString();
-            return Convert.ToInt32(InvokeMethod("getblockcount")["result"].ToString());
+            return Convert.ToInt32(TryInvokeMethod("getblockcount")["result"].ToString());
         }
 
         public object ListAccounts()
