@@ -9,33 +9,31 @@ namespace radium_UTXO_server.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UTXOController : ControllerBase
+    public class StakeController : ControllerBase
     {
         // GET api/values
         [HttpGet]
         public ActionResult<string> Get()
         {
-            JObject response = new JObject();
-            response.Add("synced", UtxoServer.Synced);
-            response.Add("progress", UtxoServer.sync_percent);
-            return response.ToString();
+
+            return "Stake API";
         }
 
         // GET api/values/5
-        [HttpGet("{id}")]
-        public ActionResult<string> Get(string id)
+        [HttpGet("{address}/{blocks}")]
+        public ActionResult<string> Get(string address, int blocks)
         {
-            IEnumerable<utxo> result = UtxoServer.utxos.Where(i => i.address == id);
+            IEnumerable<stake> result = UtxoServer.stakes.Where(i => i.address == address && i.block > (UtxoServer.SyncHeight - blocks) );
             JArray response = new JArray();
-            foreach (utxo unspent in result)
+            foreach (stake _stake in result)
             {
-                response.Add(unspent.ToJson());
+                response.Add(_stake.ToJson());
             }
 
             return response.ToString();
         }
 
+       
 
-        
     }
 }

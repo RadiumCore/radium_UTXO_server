@@ -22,7 +22,8 @@ namespace radium_UTXO_server
 
 
         public static  Collection<utxo> utxos = new Collection<utxo>();
-        private static int SyncHeight = 1;
+        public static Collection<stake> stakes = new Collection<stake>();
+        public static int SyncHeight = 1;
 
         public static  Thread SyncThread = new Thread(new ThreadStart(Sync));
 
@@ -83,30 +84,38 @@ namespace radium_UTXO_server
                 JToken transaction = default(JToken);
                 BlockChainBlock = bcMain.TryInvokeMethod("getblockbynumber", curblock);
                 JArray txarray = (JArray)BlockChainBlock["result"]["tx"];
-                foreach (JToken txid in BlockChainBlock["result"]["tx"])
+                for(int index = 0; index <= BlockChainBlock["result"]["tx"].Count() -1; index ++)
                 {
-                    transaction = bcMain.TryInvokeMethod("gettransaction", txid)["result"];
+                    transaction = bcMain.TryInvokeMethod("gettransaction", BlockChainBlock["result"]["tx"][index])["result"];
                    
-                    foreach (JToken vin in transaction["vin"]){
+                    if(index == 1)
+                        {
+                            // this is a stake transaction. 
+                            stakes.Add(new stake((string)transaction["txid"], (decimal) GetStakeReward(curblock), (string)transaction["vout"][1]["scriptPubKey"]["addresses"][0],curblock));
+
+                        }
+
+                        // removed spent utxo's form utxo pool
+                        foreach (JToken vin in transaction["vin"]){
                         if (vin["coinbase"] != null) { continue; }
                         utxos.Remove(utxos.SingleOrDefault(i => i.txid == (string)vin["txid"] && i.index == (int)vin["vout"]));
-
                     }
+                   
                     foreach (JToken vout in transaction["vout"])
                     {
-                        if((decimal)vout["value"] == 0) { continue; }
+                        // dont track utxo's with:
+                        // no value,
+                        if ((decimal)vout["value"] == 0) { continue; }
+                        // tiny value
                         if ((double)vout["value"] < .00001) { continue; }
+                        // null data (no value)
                         if ((string)vout["scriptPubKey"]["type"] == "nulldata") { continue; }
-                        if ((string)vout["scriptPubKey"]["type"] == "nonstandard") {
-                            continue;
-                        }
+                        // non standard (no value
+                        if ((string)vout["scriptPubKey"]["type"] == "nonstandard") { continue; }
+                        // dont add duplicate tx's (shouldnt happen)
+                        if ( utxos.Any(i => i.txid == (string)transaction["txid"] && i.index == (int)vout["n"])) {continue;}
 
-                        if ( utxos.Any(i => i.txid == (string)txid && i.index == (int)vout["n"])) 
-                        {
-                            continue;
-                        }
-
-                        utxos.Add(new utxo((string)txid, (int)vout["n"], (decimal)vout["value"], (string)vout["scriptPubKey"]["addresses"][0]));
+                        utxos.Add(new utxo((string)transaction["txid"], (int)vout["n"], (decimal)vout["value"], (string)vout["scriptPubKey"]["addresses"][0]));
 
                     }
                 
@@ -116,7 +125,7 @@ namespace radium_UTXO_server
                 SyncHeight = curblock;
                 if (curblock % 100 == 1)
                 {
-                    Save(utxos, SyncHeight);
+                    Save(utxos, SyncHeight, stakes);
                 }
 
                     SyncHeight = curblock;
@@ -131,7 +140,7 @@ namespace radium_UTXO_server
 
 
 
-        public static void Save(Collection<utxo> _utxos, int _SyncHeight)
+        public static void Save(Collection<utxo> _utxos, int _SyncHeight, Collection<stake> _stakes)
         {
             SaveFile savedstate = new SaveFile
             {
@@ -140,17 +149,27 @@ namespace radium_UTXO_server
                
             };
 
+            stakesSaveFile savedStakes = new stakesSaveFile
+            {
+                Stakes = _stakes,
+            };
+
+
+
+
             string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData) + "\\smartchain";
 
             if ((!System.IO.Directory.Exists(path)))
                 System.IO.Directory.CreateDirectory(path);
 
             FileStream SaveDataFilestream = new FileStream(path + "\\utxos.sc", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
-          
+            FileStream SaveStakeFilestream = new FileStream(path + "\\stakes.sc", FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+
             System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bf = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
             try
             {
-                bf.Serialize(SaveDataFilestream, savedstate);               
+                bf.Serialize(SaveDataFilestream, savedstate);
+                bf.Serialize(SaveStakeFilestream, savedStakes);
             }
             catch (Exception ex1)
             {
@@ -158,6 +177,7 @@ namespace radium_UTXO_server
             }
 
             SaveDataFilestream.Close();
+            SaveStakeFilestream.Close();
 
             Console.WriteLine("sucessfully wrote save data");
           
@@ -193,9 +213,23 @@ namespace radium_UTXO_server
                 }
             }
 
-          
-               
-           
+            if (File.Exists(path + "\\stakes.sc"))
+            {
+                FileStream DataFileStream = new FileStream(path + "\\stakes.sc", FileMode.Open);
+
+                try
+                {
+                    stakesSaveFile _stakes = (stakesSaveFile)bf.Deserialize(DataFileStream);
+                    stakes = _stakes.Stakes;
+                    DataFileStream.Close();
+                }
+                catch (Exception ex)
+                {
+                    DataFileStream.Close();
+                }
+            }
+
+
             //End If
 
         }
@@ -209,10 +243,36 @@ namespace radium_UTXO_server
             Console.Write(line);
         }
 
+        public static Double GetStakeReward(int block)
+        {
+            int nYear = 525600;
+             int DEV_FUND_BLOCK_HEIGHT = 1655000;
+            if (block >= DEV_FUND_BLOCK_HEIGHT && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear)
+                return 0.5;
+            else if (block >= DEV_FUND_BLOCK_HEIGHT + nYear && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear *2)
+                return 0.485;
+            else if (block >= DEV_FUND_BLOCK_HEIGHT + nYear *2 && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear *3)
+                return 0.47;
+            else if (block >= DEV_FUND_BLOCK_HEIGHT + nYear * 3 && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear * 4)
+                return 0.456;
+            else if (block >= DEV_FUND_BLOCK_HEIGHT + nYear * 4 && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear * 5)
+                return 0.442;
+            else if (block >= DEV_FUND_BLOCK_HEIGHT + nYear * 5 && block + 1 < DEV_FUND_BLOCK_HEIGHT + nYear * 6)
+                return 0.429;
+            return 0;
+
+
+
+        }
+
+            
+            
+        }
+
     }
        
            
     
 
 
-}
+
