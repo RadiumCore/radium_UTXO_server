@@ -88,7 +88,7 @@ namespace radium_UTXO_server
                 {
                     transaction = bcMain.TryInvokeMethod("gettransaction", BlockChainBlock["result"]["tx"][index])["result"];
                    
-                    if(index == 1)
+                    if(curblock > 2734 && index == 1)
                         {
                             // this is a stake transaction. 
                             stakes.Add(new stake((string)transaction["txid"], (decimal) GetStakeReward(curblock), (string)transaction["vout"][1]["scriptPubKey"]["addresses"][0],curblock));
