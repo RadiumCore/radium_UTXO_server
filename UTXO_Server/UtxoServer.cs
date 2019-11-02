@@ -91,7 +91,12 @@ namespace radium_UTXO_server
                     if(curblock > 2734 && index == 1)
                         {
                             // this is a stake transaction. 
-                            stakes.Add(new stake((string)transaction["txid"], (decimal) GetStakeReward(curblock), (string)transaction["vout"][1]["scriptPubKey"]["addresses"][0],curblock));
+                            try
+                            {
+                                stakes.Add(new stake((string)transaction["txid"], (decimal)GetStakeReward(curblock), (string)transaction["vout"][transaction["vount"].Count() -1]["scriptPubKey"]["addresses"][0], curblock));
+                            }
+                            catch { };
+
 
                         }
 
