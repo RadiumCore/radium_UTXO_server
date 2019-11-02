@@ -93,7 +93,7 @@ namespace radium_UTXO_server
                             // this is a stake transaction. 
                             try
                             {
-                                stakes.Add(new stake((string)transaction["txid"], (decimal)GetStakeReward(curblock), (string)transaction["vout"][transaction["vount"].Count() -1]["scriptPubKey"]["addresses"][0], curblock));
+                                stakes.Add(new stake((string)transaction["txid"], (decimal)GetStakeReward(curblock), (string)transaction["vout"][transaction["vout"].Count() -1]["scriptPubKey"]["addresses"][0], curblock));
                             }
                             catch { };
 
