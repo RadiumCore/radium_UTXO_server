@@ -79,7 +79,7 @@ namespace radium_UTXO_server
                 }
             for (int curblock = SyncHeight; curblock <= highestnetworkblock; curblock++)
             {
-                OverwriteConsoleLine("syncing block " + curblock + "utxo count " + utxos.Count());
+                OverwriteConsoleLine("syncing block: " + curblock + " utxo count: " + utxos.Count() + " stake count: " + stakes.Count());
                 JObject BlockChainBlock = default(JObject);
                 JToken transaction = default(JToken);
                 BlockChainBlock = bcMain.TryInvokeMethod("getblockbynumber", curblock);
